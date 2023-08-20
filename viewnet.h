@@ -31,7 +31,6 @@ struct ViewNeuron
     QGraphicsEllipseItem * neuronGItem;
     QGraphicsTextItem * text_neuron;
 
-
     int connections_count;
 
 };
