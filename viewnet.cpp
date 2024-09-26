@@ -6,8 +6,8 @@
 ViewNet::ViewNet(Net *net, QRect rect, int neuron_size, bool show_weights)
     : net(net), size(rect), neuronSize(neuron_size)
 {
-    if(!net || net->getTopology().size() < 2)
-        exit(12);
+    if(!net)
+        return;
 
     neurons = new QGraphicsItemGroup(this);
     weights = new QGraphicsItemGroup(this);
@@ -40,6 +40,8 @@ void ViewNet::setOutputSuffix(const std::vector<std::string> &labels)
 
 void ViewNet::resize(QRect rect, int neuron_size, int line_size, bool show_weights, bool bias_preafix)
 {
+    if(!net)
+        return;
     int spacer_x = ( rect.width() - m_layers.size() * neuron_size ) / ( m_layers.size() + 1);
 
     for(unsigned layer = 0; layer < m_layers.size(); layer++) {
@@ -108,6 +110,8 @@ void ViewNet::resize(QRect rect, int neuron_size, int line_size, bool show_weigh
 
 void ViewNet::updateInputLabels(bool color_neuron, int ofset)
 {
+    if(!net)
+        return;
     unsigned neuron_count =  m_layers.at(0).size() - 1;
     for(unsigned neuron = 0; neuron < neuron_count; neuron++) {
         auto & cur_neuron = m_layers.at(0).at(neuron);
@@ -128,6 +132,8 @@ void ViewNet::updateInputLabels(bool color_neuron, int ofset)
 
 void ViewNet::updateOutputLabels(bool color_neuron, bool softmax  , int ofset)
 {
+    if(!net)
+        return;
     unsigned neuron_count =  m_layers.back().size() - 1;
     unsigned x = 0;
     double max = 0.0;
@@ -167,6 +173,8 @@ void ViewNet::updateOutputLabels(bool color_neuron, bool softmax  , int ofset)
 
 void ViewNet::updateWeightsLabels()
 {
+    if(!net)
+        return;
     for(unsigned layer = 0; layer < m_layers.size() - 1; layer++) { // letzter layer keine connections???????????????????????????????????????????? auch oben schauen, ob so richtig!
         unsigned neuron_count = (m_layers.at(layer).size() - ((layer == m_layers.size() - 1) ? 1 : 0)); // letzter layer keine bios
         for(unsigned neuron = 0; neuron < neuron_count; ++neuron) {
@@ -190,5 +198,7 @@ void ViewNet::updateWeightsLabels()
 
 void ViewNet::changeNet(Net *newNetWithSameTop)
 {
+    if(!net)
+        return;
     net = newNetWithSameTop;
 }

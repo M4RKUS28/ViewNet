@@ -29,12 +29,10 @@ win32:CONFIG(release, debug|release): LIBS += -L$$PWD/../build-GenNet-Desktop_Qt
 else:win32:CONFIG(debug, debug|release): LIBS += -L$$PWD/../build-GenNet-Desktop_Qt_6_5_0_MinGW_64_bit-Debug/debug/ -lGenNet
 else:unix: LIBS += -L$$PWD/../build-GenNet-Desktop_Qt_6_5_0_MinGW_64_bit-Release/ -lGenNet
 
+
+
+win32:CONFIG(release, debug|release): LIBS += -L$$PWD/../GenNet/release/ -lGenNet
+else:win32:CONFIG(debug, debug|release): LIBS += -L$$PWD/../GenNet/debug/ -lGenNet
+
 INCLUDEPATH += $$PWD/../GenNet
 DEPENDPATH += $$PWD/../GenNet
-
-win32-g++:CONFIG(release, debug|release): PRE_TARGETDEPS += $$PWD/../build-GenNet-Desktop_Qt_6_5_0_MinGW_64_bit-Release/release/libGenNet.a
-else:win32-g++:CONFIG(debug, debug|release): PRE_TARGETDEPS += $$PWD/../build-GenNet-Desktop_Qt_6_5_0_MinGW_64_bit-Debug/debug/libGenNet.a
-else:win32:!win32-g++:CONFIG(release, debug|release): PRE_TARGETDEPS += $$PWD/../build-GenNet-Desktop_Qt_6_5_0_MinGW_64_bit-Release/release/GenNet.lib
-else:win32:!win32-g++:CONFIG(debug, debug|release): PRE_TARGETDEPS += $$PWD/../build-GenNet-Desktop_Qt_6_5_0_MinGW_64_bit-Debug/debug/GenNet.lib
-else:unix: PRE_TARGETDEPS += $$PWD/../build-GenNet-Desktop_Qt_6_5_0_MinGW_64_bit-Release/libGenNet.a
-
