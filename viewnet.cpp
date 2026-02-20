@@ -6,6 +6,7 @@
 #include <QGraphicsLineItem>
 #include <QGraphicsTextItem>
 #include <QPen>
+#include <cassert>
 #include <cmath>
 
 ViewNet::ViewNet(const Net *net, const QRect &rect, int neuron_size,
@@ -18,18 +19,21 @@ ViewNet::ViewNet(const Net *net, const QRect &rect, int neuron_size,
   weights = new QGraphicsItemGroup(this);
 
   this->setRect(rect);
-  for (size_t layerNum = 0; layerNum < net->getTopology().size(); ++layerNum) {
-    m_layers.push_back(ViewLayer());
-    size_t numOutput = (layerNum == net->getTopology().size() - 1)
+
+  const auto &topology = net->getTopology();
+  m_layers.reserve(topology.size());
+
+  for (size_t layerNum = 0; layerNum < topology.size(); ++layerNum) {
+    m_layers.emplace_back();
+    size_t numOutput = (layerNum == topology.size() - 1)
                            ? 0
-                           : net->getTopology().at(layerNum + 1).neuronCount;
-    for (size_t neuronNum = 0;
-         neuronNum < net->getTopology().at(layerNum).neuronCount + 1;
+                           : topology[layerNum + 1].neuronCount;
+    for (size_t neuronNum = 0; neuronNum < topology[layerNum].neuronCount + 1;
          ++neuronNum) {
-      m_layers.back().push_back(ViewNeuron(numOutput));
+      m_layers.back().emplace_back(numOutput);
     }
   }
-  this->resize(rect, neuron_size, 2, show_weights, true);
+  this->resize(rect, neuron_size, kDefaultLineWidth, show_weights, true);
 }
 
 ViewNet::~ViewNet() {
@@ -46,24 +50,46 @@ QColor ViewNet::getNeuronColor(double w) const {
     return Qt::white;
 }
 
-void ViewNet::setInputPraefix(const std::vector<std::string> &labels) {
-  this->praefixes = labels;
+void ViewNet::setInputPrefix(const QStringList &labels) {
+  this->prefixes = labels;
 }
 
-void ViewNet::setOutputSuffix(const std::vector<std::string> &labels) {
+void ViewNet::setOutputSuffix(const QStringList &labels) {
   this->suffixes = labels;
 }
 
+// ---------------------------------------------------------------------------
+// resize: orchestrates the full layout
+// ---------------------------------------------------------------------------
+
 void ViewNet::resize(const QRect &rect, int neuron_size, int line_size,
-                     bool show_weights, bool bias_preafix) {
+                     bool show_weights, bool bias_prefix) {
   if (!net)
     return;
+
+  layoutNeurons(rect, neuron_size, line_size, show_weights);
+  layoutBiasLabels(bias_prefix);
+  initInputTextItems();
+  initOutputTextItems();
+
+  updateWeightsLabels();
+  updateInputLabels();
+  updateOutputLabels();
+}
+
+// ---------------------------------------------------------------------------
+// layoutNeurons: positions neuron circles and their outgoing connections
+// ---------------------------------------------------------------------------
+
+void ViewNet::layoutNeurons(const QRect &rect, int neuron_size, int line_size,
+                            bool show_weights) {
   int spacer_x =
       (rect.width() - m_layers.size() * neuronSize) / (m_layers.size() + 1);
 
   for (size_t layer = 0; layer < m_layers.size(); layer++) {
+    // Visible neuron count (last layer has no bias neuron to display)
     size_t neuron_count =
-        m_layers.at(layer).size() - ((layer == m_layers.size() - 1) ? 1 : 0);
+        m_layers[layer].size() - ((layer == m_layers.size() - 1) ? 1 : 0);
     int spacer_y =
         (rect.height() - neuron_count * neuronSize) / (neuron_count + 1);
 
@@ -71,10 +97,9 @@ void ViewNet::resize(const QRect &rect, int neuron_size, int line_size,
       QPoint neuronPos(neuronSize * layer + spacer_x * (layer + 1),
                        neuronSize * neuron + spacer_y * (neuron + 1));
 
-      auto &curNeuron = m_layers.at(layer).at(neuron);
+      auto &curNeuron = m_layers[layer][neuron];
 
-      // Fix memory leak: Re-use the existing graphic items or create them if
-      // they don't exist
+      // Re-use existing graphic items or create new ones
       if (!curNeuron.neuronGItem) {
         curNeuron.neuronGItem =
             new QGraphicsEllipseItem(0, 0, neuronSize, neuronSize, this);
@@ -86,13 +111,13 @@ void ViewNet::resize(const QRect &rect, int neuron_size, int line_size,
 
       for (size_t conns = 0; conns < curNeuron.m_outputWeights.size();
            conns++) {
-        auto &con = curNeuron.m_outputWeights.at(conns);
+        auto &con = curNeuron.m_outputWeights[conns];
 
         qreal x1 = neuronPos.x() + neuronSize;
         qreal y1 = neuronPos.y() + neuronSize / 2.0;
 
         size_t next_layer_neurons =
-            m_layers.at(layer + 1).size() -
+            m_layers[layer + 1].size() -
             ((layer + 1 == m_layers.size() - 1) ? 1 : 0);
         qreal x2 = neuronPos.x() + spacer_x + neuronSize;
         qreal y2 = neuronSize * conns +
@@ -123,69 +148,82 @@ void ViewNet::resize(const QRect &rect, int neuron_size, int line_size,
       }
     }
   }
+}
 
-  // BIAS
+// ---------------------------------------------------------------------------
+// layoutBiasLabels: positions the "Bias 1" / "1" labels for each hidden layer
+// ---------------------------------------------------------------------------
+
+void ViewNet::layoutBiasLabels(bool bias_prefix) {
   for (size_t layer = 0; layer < m_layers.size() - 1; layer++) {
-    auto &cur_neuron = m_layers.at(layer).back();
+    auto &cur_neuron = m_layers[layer].back();
     if (!cur_neuron.text_neuron) {
       cur_neuron.text_neuron = new QGraphicsTextItem(this);
       neurons->addToGroup(cur_neuron.text_neuron);
     }
-    cur_neuron.text_neuron->setPlainText((bias_preafix ? "Bias 1" : "1"));
+    cur_neuron.text_neuron->setPlainText(bias_prefix ? "Bias 1" : "1");
     if (cur_neuron.neuronGItem) {
       QPointF center = cur_neuron.neuronGItem->boundingRect().center();
       QPointF sceneCenter = cur_neuron.neuronGItem->mapToScene(center);
       cur_neuron.text_neuron->setPos(
           sceneCenter - center -
-          QPointF(neuronSize / 2.0 + 10.0 + (bias_preafix ? 20.0 : 0.0), 0));
+          QPointF(neuronSize / 2.0 + kBiasLabelMargin +
+                      (bias_prefix ? kBiasLabelExtraOffset : 0.0),
+                  0));
     }
   }
+}
 
-  // INIT INPUT TEXT
-  size_t input_neuron_count = m_layers.at(0).size() - 1;
+// ---------------------------------------------------------------------------
+// initInputTextItems / initOutputTextItems: ensure text items exist
+// ---------------------------------------------------------------------------
+
+void ViewNet::initInputTextItems() {
+  size_t input_neuron_count = m_layers[0].size() - 1;
   for (size_t neuron = 0; neuron < input_neuron_count; neuron++) {
-    auto &cur_neuron = m_layers.at(0).at(neuron);
+    auto &cur_neuron = m_layers[0][neuron];
     if (!cur_neuron.text_neuron) {
       cur_neuron.text_neuron = new QGraphicsTextItem(this);
       neurons->addToGroup(cur_neuron.text_neuron);
     }
   }
+}
 
-  // INIT OUTPUT TEXT
+void ViewNet::initOutputTextItems() {
   size_t output_neuron_count = m_layers.back().size() - 1;
   for (size_t neuron = 0; neuron < output_neuron_count; neuron++) {
-    auto &cur_neuron = m_layers.back().at(neuron);
+    auto &cur_neuron = m_layers.back()[neuron];
     if (!cur_neuron.text_neuron) {
       cur_neuron.text_neuron = new QGraphicsTextItem(this);
       neurons->addToGroup(cur_neuron.text_neuron);
     }
   }
-
-  updateWeightsLabels();
-  updateInputLabels();
-  updateOutputLabels();
 }
+
+// ---------------------------------------------------------------------------
+// Update methods
+// ---------------------------------------------------------------------------
 
 void ViewNet::updateInputLabels(bool color_neuron, int offset) {
   if (!net)
     return;
-  size_t neuron_count = m_layers.at(0).size() - 1;
+  size_t neuron_count = m_layers[0].size() - 1;
   for (size_t neuron = 0; neuron < neuron_count; neuron++) {
-    auto &cur_neuron = m_layers.at(0).at(neuron);
+    auto &cur_neuron = m_layers[0][neuron];
     double w = net->getNeuronValue(0, neuron);
 
     if (cur_neuron.text_neuron) {
-      cur_neuron.text_neuron->setPlainText(
-          QString::fromStdString(
-              praefixes.size() > neuron ? praefixes.at(neuron) : "") +
-          QString::number(w));
+      QString label = (neuron < static_cast<size_t>(prefixes.size()))
+                          ? prefixes[neuron]
+                          : QString();
+      cur_neuron.text_neuron->setPlainText(label + QString::number(w));
 
       if (cur_neuron.neuronGItem) {
         QPointF center = cur_neuron.neuronGItem->boundingRect().center();
         QPointF sceneCenter = cur_neuron.neuronGItem->mapToScene(center);
         cur_neuron.text_neuron->setPos(
             sceneCenter - cur_neuron.text_neuron->boundingRect().center() -
-            QPointF(neuronSize / 2.0 + 30.0 + offset, 0));
+            QPointF(neuronSize / 2.0 + kLabelMargin + offset, 0));
       }
     }
 
@@ -214,21 +252,21 @@ void ViewNet::updateOutputLabels(bool color_neuron, bool softmax, int offset) {
   }
 
   for (size_t neuron = 0; neuron < neuron_count; neuron++) {
-    auto &cur_neuron = m_layers.back().at(neuron);
+    auto &cur_neuron = m_layers.back()[neuron];
     double w = net->getNeuronValue(m_layers.size() - 1, neuron);
 
     if (cur_neuron.text_neuron) {
-      cur_neuron.text_neuron->setPlainText(
-          QString::number(w) + QString::fromStdString(suffixes.size() > neuron
-                                                          ? suffixes.at(neuron)
-                                                          : ""));
+      QString label = (neuron < static_cast<size_t>(suffixes.size()))
+                          ? suffixes[neuron]
+                          : QString();
+      cur_neuron.text_neuron->setPlainText(QString::number(w) + label);
 
       if (cur_neuron.neuronGItem) {
         QPointF center = cur_neuron.neuronGItem->boundingRect().center();
         QPointF sceneCenter = cur_neuron.neuronGItem->mapToScene(center);
         cur_neuron.text_neuron->setPos(
             sceneCenter - cur_neuron.text_neuron->boundingRect().center() +
-            QPointF(neuronSize / 2.0 + 30.0 + offset, 0));
+            QPointF(neuronSize / 2.0 + kLabelMargin + offset, 0));
       }
     }
 
@@ -247,13 +285,11 @@ void ViewNet::updateWeightsLabels() {
   if (!net)
     return;
   for (size_t layer = 0; layer < m_layers.size() - 1; layer++) {
-    size_t neuron_count =
-        m_layers.at(layer).size() - ((layer == m_layers.size() - 1) ? 1 : 0);
+    size_t neuron_count = m_layers[layer].size();
     for (size_t neuron = 0; neuron < neuron_count; ++neuron) {
       for (size_t conns = 0;
-           conns < m_layers.at(layer).at(neuron).m_outputWeights.size();
-           conns++) {
-        auto &con = m_layers.at(layer).at(neuron).m_outputWeights.at(conns);
+           conns < m_layers[layer][neuron].m_outputWeights.size(); conns++) {
+        auto &con = m_layers[layer][neuron].m_outputWeights[conns];
 
         double w = net->getConWeight(layer, neuron, conns);
         QColor color = getNeuronColor(w);
@@ -270,8 +306,11 @@ void ViewNet::updateWeightsLabels() {
   }
 }
 
-void ViewNet::changeNet(const Net *newNetWithSameTop) {
-  if (!net)
+void ViewNet::changeNet(const Net *newNet) {
+  if (!newNet)
     return;
-  net = newNetWithSameTop;
+  assert(net && "Cannot change net on an uninitialized ViewNet");
+  assert(newNet->getTopology().size() == net->getTopology().size() &&
+         "New net must have the same topology size");
+  net = newNet;
 }
