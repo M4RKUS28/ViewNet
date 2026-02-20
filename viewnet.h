@@ -3,6 +3,7 @@
 
 #include <QGraphicsRectItem>
 #include <QStringList>
+#include <string>
 #include <vector>
 
 #include "net.h"
@@ -57,7 +58,9 @@ public:
   ~ViewNet() override;
 
   void setInputPrefix(const QStringList &labels);
+  void setInputPrefix(const std::vector<std::string> &labels);
   void setOutputSuffix(const QStringList &labels);
+  void setOutputSuffix(const std::vector<std::string> &labels);
 
   /**
    * @brief Resizes and positions all graphic items for the network.

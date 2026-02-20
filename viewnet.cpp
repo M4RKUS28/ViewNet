@@ -54,8 +54,24 @@ void ViewNet::setInputPrefix(const QStringList &labels) {
   this->prefixes = labels;
 }
 
+void ViewNet::setInputPrefix(const std::vector<std::string> &labels) {
+  QStringList qLabels;
+  qLabels.reserve(static_cast<int>(labels.size()));
+  for (const auto &s : labels)
+    qLabels << QString::fromStdString(s);
+  setInputPrefix(qLabels);
+}
+
 void ViewNet::setOutputSuffix(const QStringList &labels) {
   this->suffixes = labels;
+}
+
+void ViewNet::setOutputSuffix(const std::vector<std::string> &labels) {
+  QStringList qLabels;
+  qLabels.reserve(static_cast<int>(labels.size()));
+  for (const auto &s : labels)
+    qLabels << QString::fromStdString(s);
+  setOutputSuffix(qLabels);
 }
 
 // ---------------------------------------------------------------------------
