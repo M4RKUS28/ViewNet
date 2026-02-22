@@ -151,11 +151,11 @@ void ViewNet::layoutNeurons(const QRect &rect, int neuron_size, int line_size,
 
         if (!con.text_weight) {
           con.text_weight = new QGraphicsTextItem(
-              QString::number(net->getConWeight(layer, neuron, conns)), this);
+              QString::number(net->getConnectionWeight(layer, neuron, conns)), this);
           weights->addToGroup(con.text_weight);
         } else {
           con.text_weight->setPlainText(
-              QString::number(net->getConWeight(layer, neuron, conns)));
+              QString::number(net->getConnectionWeight(layer, neuron, conns)));
         }
 
         QPointF textPos = con.line->boundingRect().center();
@@ -307,7 +307,7 @@ void ViewNet::updateWeightsLabels() {
            conns < m_layers[layer][neuron].m_outputWeights.size(); conns++) {
         auto &con = m_layers[layer][neuron].m_outputWeights[conns];
 
-        double w = net->getConWeight(layer, neuron, conns);
+        double w = net->getConnectionWeight(layer, neuron, conns);
         QColor color = getNeuronColor(w);
 
         if (con.line) {
