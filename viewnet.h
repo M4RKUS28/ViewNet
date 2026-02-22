@@ -89,7 +89,7 @@ private:
   static constexpr int kDefaultLineWidth = 2;
 
   // --- Helper methods (called from resize) ---
-  void layoutNeurons(const QRect &rect, int neuron_size, int line_size,
+  void layoutNeurons(const QRect &rect, int line_size,
                      bool show_weights);
   void layoutBiasLabels(bool bias_prefix);
   void initInputTextItems();

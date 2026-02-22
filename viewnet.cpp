@@ -83,7 +83,8 @@ void ViewNet::resize(const QRect &rect, int neuron_size, int line_size,
   if (!net)
     return;
 
-  layoutNeurons(rect, neuron_size, line_size, show_weights);
+  neuronSize = neuron_size;
+  layoutNeurons(rect, line_size, show_weights);
   layoutBiasLabels(bias_prefix);
   initInputTextItems();
   initOutputTextItems();
@@ -97,7 +98,7 @@ void ViewNet::resize(const QRect &rect, int neuron_size, int line_size,
 // layoutNeurons: positions neuron circles and their outgoing connections
 // ---------------------------------------------------------------------------
 
-void ViewNet::layoutNeurons(const QRect &rect, int neuron_size, int line_size,
+void ViewNet::layoutNeurons(const QRect &rect, int line_size,
                             bool show_weights) {
   int spacer_x =
       (rect.width() - m_layers.size() * neuronSize) / (m_layers.size() + 1);
